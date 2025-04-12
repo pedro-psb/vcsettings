@@ -94,7 +94,7 @@ class GitTreeSettings:
                 obj_type = "blob"
             else:
                 obj_type = "unknown"
-            print(f"{sha} ({obj_type}): {obj}")
+            print(f"{sha} {obj_type[:4]} {obj}")
 
 class ObjectType(enum.IntEnum):
     commit = enum.auto()
@@ -129,7 +129,7 @@ class Blob:
     value: BlobType
     
     def __str__(self) -> str:
-        return f"Blob({self.value})"
+        return f"{type(self.value)} {self.value}"
 
 
 if __name__ == "__main__":
