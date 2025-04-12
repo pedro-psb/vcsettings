@@ -1,13 +1,16 @@
 [project]
 name = "gittree-settings"
 version = "0.1.0"
-description = "Add your description here"
+description = "A git-like tree structure for storing settings"
 readme = "README.md"
 authors = [
     { name = "Pedro Brochado", email = "pedropsb95@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = []
+
+[project.scripts]
+gittree = "gittree_settings.main:main"
 
 [build-system]
 requires = ["hatchling"]
