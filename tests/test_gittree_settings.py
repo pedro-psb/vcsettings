@@ -72,20 +72,38 @@ def test_object_hashing_multiprocess():
 
     # Create pairs of objects to test
     object_pairs = [(b0, b1), (t0, t1), (c0, c1)]
-
+    
+    # Function to return both hash and process ID
+    def hash_with_pid(obj):
+        import os
+        return (hash_object(obj), os.getpid())
+    
     # Use multiprocessing to hash each object in a separate process
     with multiprocessing.Pool(processes=2) as pool:
         for obj1, obj2 in object_pairs:
             # Hash each object in a separate process
-            hash1 = pool.apply(hash_object, (obj1,))
-            hash2 = pool.apply(hash_object, (obj2,))
-
+            result1 = pool.apply(hash_with_pid, (obj1,))
+            result2 = pool.apply(hash_with_pid, (obj2,))
+            
+            hash1, pid1 = result1
+            hash2, pid2 = result2
+            
             # Verify that the hashes are the same
             assert hash1 == hash2, f"Hashes don't match for {obj1} and {obj2}"
+            
+            # Verify that the objects were processed in different processes
+            assert pid1 != pid2, f"Objects were processed in the same process: {pid1}"
+            
+            # Verify that neither process is the main process
+            import os
+            main_pid = os.getpid()
+            assert pid1 != main_pid, f"Object 1 was processed in the main process"
+            assert pid2 != main_pid, f"Object 2 was processed in the main process"
 
             # Print for debugging
             # print(f"\nObject type: {type(obj1).__name__}")
-            # print(f"Object 1: {obj1}")
-            # print(f"Object 2: {obj2}")
+            # print(f"Object 1: {obj1}, Process: {pid1}")
+            # print(f"Object 2: {obj2}, Process: {pid2}")
             # print(f"Hash 1: {hash1}")
             # print(f"Hash 2: {hash2}")
+            # print(f"Main process: {main_pid}")
