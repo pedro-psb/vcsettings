@@ -4,7 +4,7 @@ import enum
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Optional
 
 SAMPLE1={
     "a": 1,
@@ -26,8 +26,8 @@ def main() -> int:
 
 class GitTreeSettings:
     def __init__(self):
-        self.head = None
-        self.objects: dict[str, Object] = {}
+        self.head: Optional[str] = None
+        self.objects: dict[str, Union[Commit, Tree, Blob]] = {}
 
     def commit(self, data: dict):
         """Convert a Python dictionary into git-like objects and store them."""
@@ -39,17 +39,10 @@ class GitTreeSettings:
         commit = Commit(tree=tree, metadata=commit_metadata)
         
         # Generate SHA for commit
-        # commit_sha = hash(str(commit))
         commit_sha = self._generate_sha(f"commit:{commit}")
         
         # Store the commit object
-        commit_obj = Object(
-            sha=commit_sha,
-            type=ObjectType.commit,
-            name="HEAD",
-            content=commit
-        )
-        self.objects[commit_sha] = commit_obj
+        self.objects[commit_sha] = commit
         self.head = commit_sha
         
         return commit_sha
@@ -66,27 +59,23 @@ class GitTreeSettings:
                 subtree = self._create_tree_from_dict(value, f"{name}.")
                 tree_sha = self._generate_sha(f"tree:{subtree}")
                 
-                tree_obj = Object(
-                    sha=tree_sha,
+                self.objects[tree_sha] = subtree
+                objects.append(TreeRecord(
                     type=ObjectType.tree,
                     name=name,
-                    content=subtree
-                )
-                self.objects[tree_sha] = tree_obj
-                objects.append(tree_obj)
+                    sha=tree_sha
+                ))
             else:
                 # Create a blob for primitive values
                 blob = Blob(value=value)
                 blob_sha = self._generate_sha(f"blob:{value}")
                 
-                blob_obj = Object(
-                    sha=blob_sha,
+                self.objects[blob_sha] = blob
+                objects.append(TreeRecord(
                     type=ObjectType.blob,
                     name=name,
-                    content=blob
-                )
-                self.objects[blob_sha] = blob_obj
-                objects.append(blob_obj)
+                    sha=blob_sha
+                ))
                 
         return Tree(objects=tuple(objects))
     
@@ -96,8 +85,16 @@ class GitTreeSettings:
         return hashlib.sha1(content_str.encode()).hexdigest()
 
     def print_objects(self):
-        for sha, value in self.objects.items():
-            print(sha, value)
+        for sha, obj in self.objects.items():
+            if isinstance(obj, Commit):
+                obj_type = "commit"
+            elif isinstance(obj, Tree):
+                obj_type = "tree"
+            elif isinstance(obj, Blob):
+                obj_type = "blob"
+            else:
+                obj_type = "unknown"
+            print(f"{sha} ({obj_type}): {obj}")
 
 class ObjectType(enum.IntEnum):
     commit = enum.auto()
@@ -124,6 +121,7 @@ class Tree:
 class TreeRecord:
     type: ObjectType
     name: str
+    sha: str
 
 
 @dataclass(frozen=True)
