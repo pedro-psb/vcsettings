@@ -120,16 +120,23 @@ TreeType = Union[ObjectType.tree, ObjectType.blob]
 BlobType = Union[int, str, float, bool, None]
 
 
+def _inline_dump(kv_pairs: list[tuple[str, Any]]):
+    prepared = ["=".join((k, repr(v))) for k, v in kv_pairs]
+    prepared = " ".join(prepared)
+    return f"inline {prepared}"
+
+
 @dataclass(frozen=True, order=True)
 class Commit:
     tree_sha: Tree
     metadata: tuple[tuple[str, str], ...]
+    previous: str = ""
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         extra = []
         if preset == INLINE:
-            metadata = [(k, repr(v)) for k, v in self.metadata]
-            display = "inline " + " ".join(["=".join(i) for i in metadata])
+            metadata = (("previous", self.previous[:7]),) + self.metadata
+            display = _inline_dump(metadata)
         elif preset == EXPANDED:
             extra.append("extended")
             extra.append(f"tree={self.tree_sha[:7]}")
@@ -147,9 +154,10 @@ class Tree:
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         extra = []
+        kv_pairs = None
         if preset == INLINE:
-            summary = [("count", str(len(self.objects)))]
-            display = "inline " + "".join(["=".join(i) for i in summary])
+            kv_pairs = [("count", str(len(self.objects)))]
+            display = _inline_dump(kv_pairs)
         if preset == EXPANDED:
             extra.append("extended")
             for record in self.objects:
@@ -172,7 +180,8 @@ class Blob:
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         if preset == INLINE:
-            display = f"inline type={type(self.value)} content={repr(self.value)}"
+            kv_pairs = [("type", type(self.value)), ("content", self.value)]
+            display = _inline_dump(kv_pairs)
         if preset == EXPANDED:
             display = f"expanded {type(self.value)} {self.value}"
         return display
