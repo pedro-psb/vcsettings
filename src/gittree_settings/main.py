@@ -20,6 +20,8 @@ def main() -> int:
     gt = GitTreeSettings()
     gt.commit(SAMPLE1)
     gt.print_objects()
+    gt.commit(SAMPLE2)
+    gt.print_objects()
     return 0
 
 class GitTreeSettings:
@@ -37,6 +39,7 @@ class GitTreeSettings:
         commit = Commit(tree=tree, metadata=commit_metadata)
         
         # Generate SHA for commit
+        # commit_sha = hash(str(commit))
         commit_sha = self._generate_sha(f"commit:{commit}")
         
         # Store the commit object
@@ -85,7 +88,7 @@ class GitTreeSettings:
                 self.objects[blob_sha] = blob_obj
                 objects.append(blob_obj)
                 
-        return Tree(objects=objects)
+        return Tree(objects=tuple(objects))
     
     def _generate_sha(self, content: Any) -> str:
         """Generate a SHA-like identifier for an object."""
@@ -103,21 +106,21 @@ class ObjectType(enum.IntEnum):
 
 BlobType = Union[int, str, float, bool, None]
 
-@dataclass
+@dataclass(frozen=True)
 class Commit:
     tree: Tree
     metadata: tuple[tuple[str, str], ...]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Tree:
-    objects: list[Object]
+    objects: tuple[Object, ...]
     
     def __str__(self) -> str:
         return f"Tree({len(self.objects)} objects)"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Object:
     sha: str
     type: ObjectType
@@ -125,10 +128,12 @@ class Object:
     content: Union[Tree, Blob]
     
     def __str__(self) -> str:
-        return f"Object({self.name}, {self.type.name}, {self.sha[:7]})"
+        sha_str = str(self.sha)
+        type = self.type.name[:4]
+        return f"Object({type} {sha_str[:7]} {self.name} )"
 
     
-@dataclass
+@dataclass(frozen=True)
 class Blob:
     value: BlobType
     
