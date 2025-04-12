@@ -114,25 +114,18 @@ class Commit:
 
 @dataclass(frozen=True)
 class Tree:
-    objects: tuple[Object, ...]
+    objects: tuple[TreeRecord, ...]
     
     def __str__(self) -> str:
         return f"Tree({len(self.objects)} objects)"
 
 
 @dataclass(frozen=True)
-class Object:
-    sha: str
+class TreeRecord:
     type: ObjectType
     name: str
-    content: Union[Tree, Blob]
-    
-    def __str__(self) -> str:
-        sha_str = str(self.sha)
-        type = self.type.name[:4]
-        return f"Object({type} {sha_str[:7]} {self.name} )"
 
-    
+
 @dataclass(frozen=True)
 class Blob:
     value: BlobType
