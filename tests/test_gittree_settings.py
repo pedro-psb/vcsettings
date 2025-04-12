@@ -1,4 +1,5 @@
 import pytest
+import multiprocessing
 from gittree_settings.main import (
     GitTreeSettings,
     SAMPLE1,
@@ -57,3 +58,39 @@ def test_commit_and_show():
     # Show the committed data
     data = settings.show(settings.head)
     assert data == SAMPLE1
+
+
+def hash_object_in_process(obj):
+    """Helper function to hash an object in a separate process."""
+    return hash_object(obj)
+
+
+def test_object_hashing_multiprocess():
+    """Test that object hashing is consistent across different processes."""
+    # Create pairs of identical objects
+    b0 = Blob("value")
+    b1 = Blob("value")
+    t0 = Tree((TreeRecord(ObjectType.blob, "foo", "b0"),))
+    t1 = Tree((TreeRecord(ObjectType.blob, "foo", "b0"),))
+    c0 = Commit("t0", (("a", "a"),))
+    c1 = Commit("t0", (("a", "a"),))
+    
+    # Create pairs of objects to test
+    object_pairs = [(b0, b1), (t0, t1), (c0, c1)]
+    
+    # Use multiprocessing to hash each object in a separate process
+    with multiprocessing.Pool(processes=2) as pool:
+        for obj1, obj2 in object_pairs:
+            # Hash each object in a separate process
+            hash1 = pool.apply(hash_object_in_process, (obj1,))
+            hash2 = pool.apply(hash_object_in_process, (obj2,))
+            
+            # Verify that the hashes are the same
+            assert hash1 == hash2, f"Hashes don't match for {obj1} and {obj2}"
+            
+            # Print for debugging
+            print(f"\nObject type: {type(obj1).__name__}")
+            print(f"Object 1: {obj1}")
+            print(f"Object 2: {obj2}")
+            print(f"Hash 1: {hash1}")
+            print(f"Hash 2: {hash2}")
