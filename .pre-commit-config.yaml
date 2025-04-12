@@ -3,5 +3,3 @@ repos:
     rev: v0.3.4
     hooks:
     -   id: ruff-format
-    -   id: ruff
-        args: [--select=E,F,W]
