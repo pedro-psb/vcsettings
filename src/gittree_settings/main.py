@@ -96,30 +96,9 @@ class GitTreeSettings:
         return Tree(objects=tuple(objects)) if objects else None
 
     def print_objects(self):
-        print("== PRINT-OBJECTS ==")
-        INDENT = " " * 4
         for sha, obj in self.objects.items():
-            display = ""
-            extra = []
-            if isinstance(obj, Commit):
-                obj_type = "commit"
-                extra.append(f"tree={obj.tree_sha[:7]}")
-                for k, v in obj.metadata:
-                    extra.append(f"{k}={v}")
-            elif isinstance(obj, Tree):
-                obj_type = "tree"
-                for record in obj.objects:
-                    extra.append(
-                        f"{record.obj_sha[:7]} {record.type[:4]} {record.name}"
-                    )
-            elif isinstance(obj, Blob):
-                obj_type = "blob"
-                display = obj
-            else:
-                obj_type = "unknown"
-            print(f"{sha} {obj_type[:4]} {display}")
-            for line in extra:
-                print(f"{INDENT}{line}")
+            obj_type = obj.__class__.__name__.lower()
+            print(f"{sha} {obj_type[:4]} {obj.dump()}")
         print()
 
 
@@ -128,6 +107,14 @@ class ObjectType(enum.StrEnum):
     tree = enum.auto()
     blob = enum.auto()
 
+
+class ObjectDumpPreset(enum.StrEnum):
+    inline = enum.auto()
+    expanded = enum.auto()
+
+
+INLINE = ObjectDumpPreset.inline
+EXPANDED = ObjectDumpPreset.expanded
 
 TreeType = Union[ObjectType.tree, ObjectType.blob]
 BlobType = Union[int, str, float, bool, None]
@@ -138,10 +125,38 @@ class Commit:
     tree_sha: Tree
     metadata: tuple[tuple[str, str], ...]
 
+    def dump(self, preset: ObjectDumpPreset = INLINE):
+        extra = []
+        if preset == INLINE:
+            metadata = [(k, repr(v)) for k, v in self.metadata]
+            display = "inline " + " ".join(["=".join(i) for i in metadata])
+        elif preset == EXPANDED:
+            extra.append("extended")
+            extra.append(f"tree={self.tree_sha[:7]}")
+            for k, v in self.metadata:
+                extra.append(f"{k}={v}")
+            display = "\n".join(extra)
+        else:
+            raise RuntimeError("Shouldnt happen")
+        return display
+
 
 @dataclass(frozen=True)
 class Tree:
     objects: tuple[TreeRecord, ...]
+
+    def dump(self, preset: ObjectDumpPreset = INLINE):
+        extra = []
+        if preset == INLINE:
+            summary = [("count", str(len(self.objects)))]
+            display = "inline " + "".join(["=".join(i) for i in summary])
+        if preset == EXPANDED:
+            extra.append("extended")
+            for record in self.objects:
+                extra = []
+                extra.append(f"{record.obj_sha[:7]} {record.type[:4]} {record.name}")
+            display = "\n".join(extra)
+        return display
 
 
 @dataclass(frozen=True)
@@ -155,8 +170,12 @@ class TreeRecord:
 class Blob:
     value: BlobType
 
-    def __str__(self) -> str:
-        return f"{type(self.value)} {self.value}"
+    def dump(self, preset: ObjectDumpPreset = INLINE):
+        if preset == INLINE:
+            display = f"inline type={type(self.value)} content={repr(self.value)}"
+        if preset == EXPANDED:
+            display = f"expanded {type(self.value)} {self.value}"
+        return display
 
 
 if __name__ == "__main__":
