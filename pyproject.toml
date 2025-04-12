@@ -29,8 +29,28 @@ build-backend = "hatchling.build"
 packages = ["src/gittree_settings"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4.0"]
+dev = ["pytest>=7.4.0", "pre-commit>=3.5.0", "ruff>=0.3.0", "mypy>=1.8.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+select = ["E", "F", "I", "B", "W", "C4", "UP", "N", "ANN", "COM", "D", "ERA", "PL", "RUF"]
+ignore = ["ANN101", "D203", "D212"]
+
+[tool.ruff.isort]
+known-first-party = ["gittree_settings"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
