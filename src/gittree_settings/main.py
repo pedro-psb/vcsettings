@@ -22,9 +22,12 @@ def main() -> int:
     gt.print_objects()
     gt.commit(SAMPLE2)
     gt.print_objects()
-    gt.show("e2df98dbff9b42f4f6cede687daea3e7c77da46d")
     return 0
 
+def hash_object(obj: Any):
+    """Generate a SHA-like identifier for an object."""
+    return hashlib.sha1(repr(obj).encode()).hexdigest()
+    
 class GitTreeSettings:
     def __init__(self):
         self.head: Optional[str] = None
@@ -33,14 +36,17 @@ class GitTreeSettings:
     def commit(self, data: dict):
         """Convert a Python dictionary into git-like objects and store them."""
         # Create tree from data
-        tree_hash = self._create_tree_from_dict(data)
+        tree = self._create_tree_from_dict(data)
+        tree_hash = hash_object(tree)
+        self.objects[tree_hash] = tree
         
         # Create a commit object
         commit_metadata = (("author", "gittree"), ("message", "Commit data"))
         commit = Commit(tree_sha=tree_hash, metadata=commit_metadata)
         
         # Generate SHA for commit
-        commit_sha = self._generate_sha(f"commit:{commit}")
+        commit_sha = hash_object(commit)
+        # commit_sha = str(hash(commit))
         
         # Store the commit object
         self.objects[commit_sha] = commit
@@ -49,11 +55,17 @@ class GitTreeSettings:
         return commit_sha
 
     def show(self, sha):
-        print(self.objects[sha])
+        _sha = sha
+        if len(sha) < 40:
+            _sha = [o for o in self.objects if o.startswith(sha)]
+            _sha = _sha[0] if _sha else None
+
+        if not _sha or _sha not in self.objects:
+            raise KeyError(f"Object not found: {sha}")
+        print(self.objects[_sha])
     
     def _create_tree_from_dict(self, data: dict, prefix: str = "") -> Tree:
         """Recursively create a tree structure from a dictionary."""
-        # TODO: fix this
         objects = []
         
         for key, value in data.items():
@@ -62,7 +74,7 @@ class GitTreeSettings:
             if isinstance(value, dict):
                 # Create a subtree for nested dictionaries
                 subtree = self._create_tree_from_dict(value, f"{name}.")
-                tree_sha = self._generate_sha(f"tree:{subtree}")
+                tree_sha = hash_object(f"tree:{subtree}")
                 
                 self.objects[tree_sha] = subtree
                 objects.append(TreeRecord(
@@ -73,7 +85,7 @@ class GitTreeSettings:
             else:
                 # Create a blob for primitive values
                 blob = Blob(value=value)
-                blob_sha = self._generate_sha(f"blob:{value}")
+                blob_sha = hash_object(f"blob:{value}")
                 
                 self.objects[blob_sha] = blob
                 objects.append(TreeRecord(
@@ -82,16 +94,8 @@ class GitTreeSettings:
                     obj_sha=blob_sha
                 ))
                 
-        tree = Tree(objects=tuple(objects)) if objects else None
-        tree_hash = self._generate_sha(tree)
-        self.objects[tree_hash] = tree
-        return tree_hash
+        return Tree(objects=tuple(objects)) if objects else None
     
-    def _generate_sha(self, content: Any) -> str:
-        """Generate a SHA-like identifier for an object."""
-        content_str = str(content)
-        return hashlib.sha1(content_str.encode()).hexdigest()
-
     def print_objects(self):
         print("== PRINT-OBJECTS ==")
         INDENT=" " * 4
@@ -125,7 +129,7 @@ class ObjectType(enum.StrEnum):
 TreeType = Union[ObjectType.tree, ObjectType.blob]
 BlobType = Union[int, str, float, bool, None]
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Commit:
     tree_sha: Tree
     metadata: tuple[tuple[str, str], ...]
@@ -134,9 +138,6 @@ class Commit:
 @dataclass(frozen=True)
 class Tree:
     objects: tuple[TreeRecord, ...]
-    
-    def __str__(self) -> str:
-        return f"Tree({len(self.objects)} objects)"
 
 
 @dataclass(frozen=True)

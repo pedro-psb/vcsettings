@@ -28,9 +28,6 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/gittree_settings"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0"]
 
