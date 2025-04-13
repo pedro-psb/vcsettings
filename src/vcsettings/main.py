@@ -64,14 +64,21 @@ BlobType = Union[int, str, float, bool, None]
 
 class Repository:
     def __init__(self):
+        # hope we don't git some data that gives the hash of 000...
+        self.SENTINEL_COMMIT = "0" * 40
         self.work_tree = {}
-        self.head: str = ""
+        self.head: str = "ref: heads/main"
+        self.refs = {"heads/main": self.SENTINEL_COMMIT}
         self.objects: dict[str, Union[Commit, Tree, Blob]] = {}
-        self.resolve_cache = {}
+        self.checkout_cache = {}
+
+    # Porcelain
+    # =========
 
     def commit(self, data: dict, previous=None):
         """Convert a Python dictionary into git-like objects and store them."""
-        previous = previous if previous else self.head
+        previous = previous if previous else self.resolve_refs(self.head)
+
         # Create tree from data
         tree_hash = self.create_tree(data)
 
@@ -84,24 +91,16 @@ class Repository:
     def checkout(self, commit: str, optimization=None):
         commit_obj = self.get_object(commit)
         resolved = commit_obj.resolve(self.get_object)
-        self.resolve_cache[commit] = resolved
+        self.checkout_cache[commit] = resolved
         for k, v in resolved.items():
             self.work_tree[k] = v
         self.head = commit
 
-    def get_object(self, sha: str):
-        _sha = sha
-        is_partial = len(sha) < 40
-        if is_partial:
-            # TODO: can use binary search if objects sha's are sorted
-            _sha = [o for o in self.objects if o.startswith(sha)]
-            _sha = _sha[0] if _sha else None
-        if not _sha or _sha not in self.objects:
-            raise KeyError(f"Object not found: {sha}")
-        return self.objects[_sha]
-
     def show(self, sha):
         print(self.get_object(sha))
+
+    # Plumbing
+    # ========
 
     def save_obj(self, obj):
         if not obj:
@@ -109,6 +108,39 @@ class Repository:
         sha = hash_object(obj)
         self.objects[sha] = obj
         return sha
+
+    def get_object(self, refs: str):
+        sha = self.resolve_refs(refs)
+        if not sha or sha not in self.objects:
+            raise KeyError(f"Object not found: {sha}")
+        return self.objects[sha]
+
+    def expand_sha(self, sha: str):
+        if not sha:
+            return None
+        is_partial = len(sha) < 40
+        if not is_partial and len(sha) == 40:
+            return sha
+        # TODO: can use binary search if objects sha's are sorted
+        # Maybe making the 4e/3c7... nested list can make it very efficient
+        # The nice thing is that it works for both full and partial shas
+        _sha = [o for o in self.objects if o.startswith(sha)]
+        return _sha[0] if _sha else None
+
+    def resolve_refs(self, refs: str) -> str:
+        # try to resolve: HEAD -> refs
+        is_refs_ptr = refs.startswith("ref:")
+        if is_refs_ptr:
+            ref = refs.split("ref:")[-1].strip()
+        else:
+            ref = refs
+        # try to resolve: refs -> sha
+        sha = self.refs.get(ref, ref)
+        # try to resolve what we got left
+        return self.expand_sha(sha)
+
+    def cache_object_checkout(self, sha: str, data: Any):
+        self.checkout_cache[sha] = data
 
     def create_tree(self, data: dict):
         def _create_tree_from_dict(data: dict) -> Tree:
@@ -172,6 +204,7 @@ class Commit:
             extra.append("extended")
             s = " " * 4
             extra.append(f"{s}tree={self.tree_sha[:7]}")
+            extra.append(f"{s}previous={self.previous[:7]}")
             for k, v in self.metadata:
                 extra.append(f"{s}{k}={v}")
             display = "\n".join(extra)
