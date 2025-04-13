@@ -16,29 +16,32 @@ INLINE = ObjectDumpPreset.inline
 EXPANDED = ObjectDumpPreset.expanded
 
 
-SAMPLE1 = {
-    "a": 1,
-    "b": 2,
-}
-
-SAMPLE2 = {
-    "a": 1,
-    "b": {"c": 2, "d": 3},
-}
+class SAMPLES:
+    simple = {
+        "a": 1,
+        "b": 2,
+    }
+    nested = {
+        "a": 1,
+        "b": {"c": 2, "d": 3},
+    }
 
 
 def main() -> int:
     gt = Repository()
-    sha1 = gt.commit(SAMPLE1)
+    sha1 = gt.commit(SAMPLES.simple)
     gt.print_objects()
-    sha2 = gt.commit(SAMPLE2)
+
+    sha2 = gt.commit(SAMPLES.nested)
     gt.print_objects(EXPANDED)
-    settings = gt.work_tree
 
     print("CHECKOUT")
+    settings = gt.work_tree
     print(settings)
+
     gt.checkout(sha1)
     print(settings)
+
     gt.checkout(sha2)
     print(settings)
     return 0
