@@ -6,6 +6,16 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union, Optional
 
+
+class ObjectDumpPreset(enum.StrEnum):
+    inline = enum.auto()
+    expanded = enum.auto()
+
+
+INLINE = ObjectDumpPreset.inline
+EXPANDED = ObjectDumpPreset.expanded
+
+
 SAMPLE1 = {
     "a": 1,
     "b": 2,
@@ -22,7 +32,7 @@ def main() -> int:
     sha1 = gt.commit(SAMPLE1)
     gt.print_objects()
     sha2 = gt.commit(SAMPLE2)
-    gt.print_objects()
+    gt.print_objects(EXPANDED)
     settings = gt.work_tree
 
     print("CHECKOUT")
@@ -37,6 +47,16 @@ def main() -> int:
 def hash_object(obj: Any):
     """Generate a SHA-like identifier for an object."""
     return hashlib.sha1(repr(obj).encode()).hexdigest()
+
+
+class ObjectType(enum.StrEnum):
+    commit = enum.auto()
+    tree = enum.auto()
+    blob = enum.auto()
+
+
+TreeType = Union[ObjectType.tree, ObjectType.blob]
+BlobType = Union[int, str, float, bool, None]
 
 
 class Repository:
@@ -116,29 +136,11 @@ class Repository:
         self.objects[tree_hash] = tree
         return tree_hash
 
-    def print_objects(self):
+    def print_objects(self, preset: ObjectDumpPreset = INLINE):
         for sha, obj in self.objects.items():
             obj_type = obj.__class__.__name__.lower()
-            print(f"{sha} {obj_type[:4]} {obj.dump()}")
+            print(f"{sha} {obj_type[:4]} {obj.dump(preset)}")
         print()
-
-
-class ObjectType(enum.StrEnum):
-    commit = enum.auto()
-    tree = enum.auto()
-    blob = enum.auto()
-
-
-class ObjectDumpPreset(enum.StrEnum):
-    inline = enum.auto()
-    expanded = enum.auto()
-
-
-INLINE = ObjectDumpPreset.inline
-EXPANDED = ObjectDumpPreset.expanded
-
-TreeType = Union[ObjectType.tree, ObjectType.blob]
-BlobType = Union[int, str, float, bool, None]
 
 
 def _inline_dump(kv_pairs: list[tuple[str, Any]]):
@@ -164,9 +166,10 @@ class Commit:
             display = _inline_dump(metadata)
         elif preset == EXPANDED:
             extra.append("extended")
-            extra.append(f"tree={self.tree_sha[:7]}")
+            s = " " * 4
+            extra.append(f"{s}tree={self.tree_sha[:7]}")
             for k, v in self.metadata:
-                extra.append(f"{k}={v}")
+                extra.append(f"{s}{k}={v}")
             display = "\n".join(extra)
         else:
             raise RuntimeError("Shouldnt happen")
@@ -190,8 +193,8 @@ class Tree:
         if preset == EXPANDED:
             extra.append("extended")
             for record in self.objects:
-                extra = []
-                extra.append(f"{record.obj_sha[:7]} {record.type[:4]} {record.name}")
+                s = " " * 4
+                extra.append(f"{s}{record.obj_sha[:7]} {record.type[:4]} {record.name}")
             display = "\n".join(extra)
         return display
 
