@@ -4,14 +4,14 @@ A version controlled settings framework using git fundamental concepts and stuct
 
 ## Vision
 
-* The working tree is a mutable and long living dictionary that is updated by the framework.
-* Branches are used to separate user environments (dev, prod, ...) and internal data
+* The **working tree** is a mutable and long living dictionary that is updated by the framework.
+* **Branches** are used to separate user environments (dev, prod, ...) and internal data
   such as raw data from loaders.
-* Running a loader means getting the parsed data from it's source and commiting it to a unique branch.
-* Merge is handled by explicitly creating merge commits from any two commit/branches. Let's not open the rebase box.
-* Merge conflicts are resolved via composable merge resolvers functions or classes.
-* Validation can be done transparently for any given commit
-* Dynamic values and key/value transformations are handled outside the framework. Once evaluated they are commited as usual.
+* Running a **loader** means getting the parsed data from it's source and commiting it to a unique branch.
+* **Merge** is handled by explicitly creating merge commits from any two commit/branches. Let's not open the rebase box.
+* **Merge conflicts** are resolved via composable merge resolvers functions or classes.
+* **Validation** can be done transparently for any given commit
+* **Dynamic values** and key/value **transformations** are handled outside the framework. Once evaluated they are commited as usual.
 
 ## Sample Usage
 
