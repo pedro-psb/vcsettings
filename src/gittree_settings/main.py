@@ -49,15 +49,12 @@ class Repository:
     def commit(self, data: dict, previous=""):
         """Convert a Python dictionary into git-like objects and store them."""
         # Create tree from data
-        tree = self._create_tree_from_dict(data)
-        tree_hash = hash_object(tree)
-        self.objects[tree_hash] = tree
+        tree_hash = self.create_tree(data)
 
         # Create a commit object
         commit_metadata = (("author", "gittree"), ("message", "Commit data"))
         commit = Commit(tree_sha=tree_hash, metadata=commit_metadata, previous=previous)
-        commit_sha = hash_object(commit)
-        self.objects[commit_sha] = commit
+        commit_sha = self.save_obj(commit)
         return commit_sha
 
     def checkout(self, commit: str, optimization=None):
@@ -82,32 +79,42 @@ class Repository:
     def show(self, sha):
         print(self.get_object(sha))
 
-    def _create_tree_from_dict(self, data: dict) -> Tree:
-        """Recursively create a tree structure from a dictionary."""
-        objects = []
+    def save_obj(self, obj):
+        if not obj:
+            raise RuntimeError("Object can't be empty")
+        sha = hash_object(obj)
+        self.objects[sha] = obj
+        return sha
 
-        for key, value in data.items():
-            name = key
-            if isinstance(value, dict):
-                # Create a subtree for nested dictionaries
-                subtree = self._create_tree_from_dict(value)
-                tree_sha = hash_object(f"tree:{subtree}")
+    def create_tree(self, data: dict):
+        def _create_tree_from_dict(data: dict) -> Tree:
+            """Recursively create a tree structure from a dictionary."""
+            if not data:
+                raise ValueError("Non empty data must be provided")
+            tree_objects = []
+            for key, value in data.items():
+                name = key
+                if isinstance(value, dict):
+                    # Create a subtree for nested dictionaries
+                    subtree = _create_tree_from_dict(value)
+                    tree_sha = self.save_obj(subtree)
+                    tree_objects.append(
+                        TreeRecord(type=ObjectType.tree, name=name, obj_sha=tree_sha)
+                    )
+                else:
+                    # Create a blob for primitive values
+                    blob = Blob(value=value)
+                    blob_sha = self.save_obj(blob)
+                    tree_objects.append(
+                        TreeRecord(type=ObjectType.blob, name=name, obj_sha=blob_sha)
+                    )
+            tree = Tree(objects=tuple(tree_objects))
+            return tree
 
-                self.objects[tree_sha] = subtree
-                objects.append(
-                    TreeRecord(type=ObjectType.tree, name=name, obj_sha=tree_sha)
-                )
-            else:
-                # Create a blob for primitive values
-                blob = Blob(value=value)
-                blob_sha = hash_object(f"blob:{value}")
-
-                self.objects[blob_sha] = blob
-                objects.append(
-                    TreeRecord(type=ObjectType.blob, name=name, obj_sha=blob_sha)
-                )
-
-        return Tree(objects=tuple(objects)) if objects else None
+        tree = _create_tree_from_dict(data)
+        tree_hash = hash_object(tree)
+        self.objects[tree_hash] = tree
+        return tree_hash
 
     def print_objects(self):
         for sha, obj in self.objects.items():
