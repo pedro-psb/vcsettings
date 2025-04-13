@@ -2,7 +2,7 @@ import pytest
 import os
 import multiprocessing
 from gittree_settings.main import (
-    GitTreeSettings,
+    Repository,
     SAMPLE1,
     Commit,
     Tree,
@@ -17,7 +17,7 @@ def test_imutability(): ...
 
 
 def test_object_hashing():
-    """Test that GitTreeSettings initializes correctly."""
+    """Test that Repository initializes correctly."""
     b0 = Blob("value")
     b1 = Blob("value")
     t0 = Tree((TreeRecord(ObjectType.blob, "foo", "b0"),))
@@ -37,7 +37,7 @@ def test_object_hashing():
 # @pytest.mark.parametrize()
 def test_create_tree_deterministic():
     data0 = {"a": "a"}
-    settings = GitTreeSettings()
+    settings = Repository()
     t0 = settings._create_tree_from_dict(data0)
     t1 = settings._create_tree_from_dict(data0)
     assert t0 == t1
@@ -46,7 +46,7 @@ def test_create_tree_deterministic():
 
 def test_commit_and_show():
     """Test that we can commit data and show it."""
-    settings = GitTreeSettings()
+    settings = Repository()
     assert settings.head is None
 
     settings.commit(SAMPLE1)

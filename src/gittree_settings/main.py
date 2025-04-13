@@ -18,11 +18,19 @@ SAMPLE2 = {
 
 
 def main() -> int:
-    gt = GitTreeSettings()
-    gt.commit(SAMPLE1)
+    gt = Repository()
+    sha1 = gt.commit(SAMPLE1)
     gt.print_objects()
-    gt.commit(SAMPLE2)
+    sha2 = gt.commit(SAMPLE2)
     gt.print_objects()
+    settings = gt.work_tree
+
+    print("CHECKOUT")
+    print(settings)
+    gt.checkout(sha1)
+    print(settings)
+    gt.checkout(sha2)
+    print(settings)
     return 0
 
 
@@ -31,12 +39,14 @@ def hash_object(obj: Any):
     return hashlib.sha1(repr(obj).encode()).hexdigest()
 
 
-class GitTreeSettings:
+class Repository:
     def __init__(self):
+        self.work_tree = {}
         self.head: Optional[str] = None
         self.objects: dict[str, Union[Commit, Tree, Blob]] = {}
+        self.resolve_cache = {}
 
-    def commit(self, data: dict):
+    def commit(self, data: dict, previous=""):
         """Convert a Python dictionary into git-like objects and store them."""
         # Create tree from data
         tree = self._create_tree_from_dict(data)
@@ -45,38 +55,42 @@ class GitTreeSettings:
 
         # Create a commit object
         commit_metadata = (("author", "gittree"), ("message", "Commit data"))
-        commit = Commit(tree_sha=tree_hash, metadata=commit_metadata)
-
-        # Generate SHA for commit
+        commit = Commit(tree_sha=tree_hash, metadata=commit_metadata, previous=previous)
         commit_sha = hash_object(commit)
-        # commit_sha = str(hash(commit))
-
-        # Store the commit object
         self.objects[commit_sha] = commit
-        self.head = commit_sha
-
         return commit_sha
 
-    def show(self, sha):
+    def checkout(self, commit: str, optimization=None):
+        commit_obj = self.get_object(commit)
+        resolved = commit_obj.resolve(self.get_object)
+        self.resolve_cache[commit] = resolved
+        for k, v in resolved.items():
+            self.work_tree[k] = v
+        self.head = commit
+
+    def get_object(self, sha: str):
         _sha = sha
-        if len(sha) < 40:
+        is_partial = len(sha) < 40
+        if is_partial:
+            # TODO: can use binary search if objects sha's are sorted
             _sha = [o for o in self.objects if o.startswith(sha)]
             _sha = _sha[0] if _sha else None
-
         if not _sha or _sha not in self.objects:
             raise KeyError(f"Object not found: {sha}")
-        print(self.objects[_sha])
+        return self.objects[_sha]
 
-    def _create_tree_from_dict(self, data: dict, prefix: str = "") -> Tree:
+    def show(self, sha):
+        print(self.get_object(sha))
+
+    def _create_tree_from_dict(self, data: dict) -> Tree:
         """Recursively create a tree structure from a dictionary."""
         objects = []
 
         for key, value in data.items():
-            name = f"{prefix}{key}" if prefix else key
-
+            name = key
             if isinstance(value, dict):
                 # Create a subtree for nested dictionaries
-                subtree = self._create_tree_from_dict(value, f"{name}.")
+                subtree = self._create_tree_from_dict(value)
                 tree_sha = hash_object(f"tree:{subtree}")
 
                 self.objects[tree_sha] = subtree
@@ -132,6 +146,10 @@ class Commit:
     metadata: tuple[tuple[str, str], ...]
     previous: str = ""
 
+    def resolve(self, get_obj):
+        tree = get_obj(self.tree_sha)
+        return tree.resolve(get_obj)
+
     def dump(self, preset: ObjectDumpPreset = INLINE):
         extra = []
         if preset == INLINE:
@@ -151,6 +169,10 @@ class Commit:
 @dataclass(frozen=True)
 class Tree:
     objects: tuple[TreeRecord, ...]
+
+    def resolve(self, get_obj):
+        objects = [(rec.name, get_obj(rec.obj_sha)) for rec in self.objects]
+        return {k: v.resolve(get_obj) for k, v in objects}
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         extra = []
@@ -177,6 +199,9 @@ class TreeRecord:
 @dataclass(frozen=True)
 class Blob:
     value: BlobType
+
+    def resolve(self, get_obj):
+        return self.value
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         if preset == INLINE:

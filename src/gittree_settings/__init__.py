@@ -1,3 +1,3 @@
-from .main import GitTreeSettings, Commit, Tree, TreeRecord, Blob, ObjectType
+from .main import Repository, Commit, Tree, TreeRecord, Blob, ObjectType
 
-__all__ = ["GitTreeSettings", "Commit", "Tree", "TreeRecord", "Blob", "ObjectType"]
+__all__ = ["Repository", "Commit", "Tree", "TreeRecord", "Blob", "ObjectType"]
