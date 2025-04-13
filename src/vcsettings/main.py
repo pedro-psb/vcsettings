@@ -65,17 +65,18 @@ BlobType = Union[int, str, float, bool, None]
 class Repository:
     def __init__(self):
         self.work_tree = {}
-        self.head: Optional[str] = None
+        self.head: str = ""
         self.objects: dict[str, Union[Commit, Tree, Blob]] = {}
         self.resolve_cache = {}
 
-    def commit(self, data: dict, previous=""):
+    def commit(self, data: dict, previous=None):
         """Convert a Python dictionary into git-like objects and store them."""
+        previous = previous if previous else self.head
         # Create tree from data
         tree_hash = self.create_tree(data)
 
         # Create a commit object
-        commit_metadata = (("author", "gittree"), ("message", "Commit data"))
+        commit_metadata = (("loader", "library"), ("message", "Some message"))
         commit = Commit(tree_sha=tree_hash, metadata=commit_metadata, previous=previous)
         commit_sha = self.save_obj(commit)
         return commit_sha

@@ -1,7 +1,7 @@
 import pytest
 import os
 import multiprocessing
-from gittree_settings.main import (
+from vcsettings.main import (
     Repository,
     SAMPLE1,
     Commit,

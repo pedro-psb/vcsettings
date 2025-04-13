@@ -18,8 +18,8 @@ classifiers = [
 vcsettings = "vcsettings.main:main"
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/gittree-settings"
-"Bug Tracker" = "https://github.com/yourusername/gittree-settings/issues"
+"Homepage" = "https://github.com/pedro-psb/vcsettings"
+"Bug Tracker" = "https://github.com/pedro-psb/vcsettings/issues"
 
 [build-system]
 requires = ["hatchling"]
