@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import hashlib
 import json
+from dynaconf.utils import object_merge
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union, Optional
 
@@ -17,14 +18,8 @@ EXPANDED = ObjectDumpPreset.expanded
 
 
 class SAMPLES:
-    simple = {
-        "a": 1,
-        "b": 2,
-    }
-    nested = {
-        "a": 1,
-        "b": {"c": 2, "d": 3},
-    }
+    simple = {"a": 1, "b": 2, "c": [1, 2]}
+    nested = {"a": 1, "b": {"c": 2, "d": 3}, "c": [2, 3, 4, "dynaconf_merge_unique"]}
 
 
 def main() -> int:
@@ -44,6 +39,11 @@ def main() -> int:
 
     gt.checkout(sha2)
     print(settings)
+
+    sha3 = gt.merge_commits(sha2, sha1)
+    gt.checkout(sha3)
+    print(settings)
+
     return 0
 
 
@@ -101,6 +101,14 @@ class Repository:
 
     # Plumbing
     # ========
+
+    def merge_commits(self, base_ref: str, other_ref: str):
+        base_commit = self.get_object(base_ref)
+        other_commit = self.get_object(other_ref)
+        base_data = base_commit.resolve(self.get_object)
+        other_data = other_commit.resolve(self.get_object)
+        object_merge(other_data, base_data)
+        return self.commit(base_data, previous=base_ref)
 
     def save_obj(self, obj):
         if not obj:
