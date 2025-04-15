@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union, Optional
 
 
+class RepositoryState(enum.StrEnum):
+    detached = enum.auto()
+    dirty = enum.auto()
+
+
 class TreeType(enum.StrEnum):
     dict = enum.auto()
     list = enum.auto()
@@ -86,7 +91,9 @@ class Repository:
         self.work_tree = {}
         self.head: str = "ref: heads/main"
         self.refs = {"heads/main": self.SENTINEL_COMMIT}
-        self.objects: dict[str, Union[Commit, Tree, Blob]] = {}
+        self.objects: dict[str, Union[Commit, Tree, Blob]] = {
+            self.SENTINEL_COMMIT: Tree(objects=tuple(), type=TreeType.dict)
+        }
         self.checkout_cache = {}
 
     # Porcelain
@@ -103,21 +110,41 @@ class Repository:
         commit_metadata = (("loader", "library"), ("message", "Some message"))
         commit = Commit(tree_sha=tree_hash, metadata=commit_metadata, previous=previous)
         commit_sha = self.save_obj(commit)
+        self.update_refs(self.dereference_head(), commit_sha)
         return commit_sha
 
-    def checkout(self, commit: str, optimization=None):
-        commit_obj = self.get_object(commit)
+    def checkout(self, refs: str, optimization=None):
+        commit_sha = self.resolve_refs(refs)
+        commit_obj = self.get_object(commit_sha)
         resolved = commit_obj.resolve(self.get_object)
-        self.checkout_cache[commit] = resolved
+        self.checkout_cache[commit_sha] = resolved
+        remove = self.work_tree.keys() - resolved.keys()
+        for k in remove:
+            del self.work_tree[k]
         for k, v in resolved.items():
             self.work_tree[k] = v
-        self.head = commit
+        self.update_refs(self.dereference_head(), commit_sha)
 
     def show(self, sha):
         print(self.get_object(sha))
 
     # Plumbing
     # ========
+
+    @property
+    def detached_state(self):
+        return not self.head.startswith("ref:")
+
+    def dereference_head(self):
+        if self.detached_state:
+            raise RuntimeError()
+        ref = self.head.split("ref:")[-1].strip()
+        return ref
+
+    def update_refs(self, ref: str, commit_sha: str):
+        if commit_sha.startswith("ref:"):
+            raise RuntimeError("Must not be a refs ptr")
+        self.refs[ref] = commit_sha
 
     def merge_commits(self, base_ref: str, other_ref: str):
         base_commit = self.get_object(base_ref)

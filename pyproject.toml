@@ -18,6 +18,7 @@ classifiers = [
 
 [project.scripts]
 vcsettings = "vcsettings.main:main"
+dynaconflib = "dynaconflib.__main__:main"
 
 [project.urls]
 "Homepage" = "https://github.com/pedro-psb/vcsettings"
