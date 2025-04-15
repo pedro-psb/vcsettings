@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union, Optional
 
 
+class TreeType(enum.StrEnum):
+    dict = enum.auto()
+    list = enum.auto()
+
+
 class ObjectDumpPreset(enum.StrEnum):
     inline = enum.auto()
     expanded = enum.auto()
@@ -47,6 +52,13 @@ def main() -> int:
     return 0
 
 
+def iter_tree(container):
+    if isinstance(container, list):
+        return enumerate(container)
+    else:
+        return container.items()
+
+
 def hash_object(obj: Any):
     """Generate a SHA-like identifier for an object."""
     return hashlib.sha1(repr(obj).encode()).hexdigest()
@@ -58,7 +70,7 @@ class ObjectType(enum.StrEnum):
     blob = enum.auto()
 
 
-TreeType = Union[ObjectType.tree, ObjectType.blob]
+TreeObjectType = Union[ObjectType.tree, ObjectType.blob]
 BlobType = Union[int, str, float, bool, None]
 
 
@@ -151,33 +163,37 @@ class Repository:
         self.checkout_cache[sha] = data
 
     def create_tree(self, data: dict):
-        def _create_tree_from_dict(data: dict) -> Tree:
-            """Recursively create a tree structure from a dictionary."""
+        def _create_tree_from_dict(data: dict | list) -> Tree:
+            """Recursively create a tree structure from a dictionary or list."""
             if not data:
                 raise ValueError("Non empty data must be provided")
             tree_objects = []
-            for key, value in data.items():
+            tree_type = TreeType.list if isinstance(data, list) else TreeType.dict
+            for key, value in iter_tree(data):
                 name = key
                 if isinstance(value, dict):
-                    # Create a subtree for nested dictionaries
+                    subtree = _create_tree_from_dict(value)
+                    tree_sha = self.save_obj(subtree)
+                    tree_objects.append(
+                        TreeRecord(type=ObjectType.tree, name=name, obj_sha=tree_sha)
+                    )
+                elif isinstance(value, list):
                     subtree = _create_tree_from_dict(value)
                     tree_sha = self.save_obj(subtree)
                     tree_objects.append(
                         TreeRecord(type=ObjectType.tree, name=name, obj_sha=tree_sha)
                     )
                 else:
-                    # Create a blob for primitive values
                     blob = Blob(value=value)
                     blob_sha = self.save_obj(blob)
                     tree_objects.append(
                         TreeRecord(type=ObjectType.blob, name=name, obj_sha=blob_sha)
                     )
-            tree = Tree(objects=tuple(tree_objects))
+            tree = Tree(objects=tuple(tree_objects), type=tree_type)
             return tree
 
         tree = _create_tree_from_dict(data)
-        tree_hash = hash_object(tree)
-        self.objects[tree_hash] = tree
+        tree_hash = self.save_obj(tree)
         return tree_hash
 
     def print_objects(self, preset: ObjectDumpPreset = INLINE):
@@ -224,21 +240,27 @@ class Commit:
 @dataclass(frozen=True)
 class Tree:
     objects: tuple[TreeRecord, ...]
+    type: TreeType
 
     def resolve(self, get_obj):
         objects = [(rec.name, get_obj(rec.obj_sha)) for rec in self.objects]
-        return {k: v.resolve(get_obj) for k, v in objects}
+        if self.type == TreeType.dict:
+            data = {k: v.resolve(get_obj) for k, v in objects}
+        else:
+            data = [v.resolve(get_obj) for _, v in objects]
+        return data
 
     def dump(self, preset: ObjectDumpPreset = INLINE):
         extra = []
         kv_pairs = None
         if preset == INLINE:
-            kv_pairs = [("count", str(len(self.objects)))]
+            kv_pairs = [("type", self.type.name), ("count", str(len(self.objects)))]
             display = _inline_dump(kv_pairs)
         if preset == EXPANDED:
             extra.append("extended")
+            s = " " * 4
+            extra.append(f"{s}type={self.type}")
             for record in self.objects:
-                s = " " * 4
                 extra.append(f"{s}{record.obj_sha[:7]} {record.type[:4]} {record.name}")
             display = "\n".join(extra)
         return display
@@ -246,7 +268,7 @@ class Tree:
 
 @dataclass(frozen=True)
 class TreeRecord:
-    type: TreeType
+    type: TreeObjectType
     name: str
     obj_sha: str
 
