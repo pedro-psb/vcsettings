@@ -23,16 +23,20 @@ EXPANDED = ObjectDumpPreset.expanded
 
 
 class SAMPLES:
-    simple = {"a": 1, "b": 2, "c": [1, 2]}
-    nested = {"a": 1, "b": {"c": 2, "d": 3}, "c": [2, 3, 4, "dynaconf_merge_unique"]}
+    listy = {"a": 1, "b": 2, "c": [1, 2]}
+    listy_merge_unique = {
+        "a": 1,
+        "b": {"c": 2, "d": 3},
+        "c": [2, 3, 4, "dynaconf_merge_unique"],
+    }
 
 
 def main() -> int:
     gt = Repository()
-    sha1 = gt.commit(SAMPLES.simple)
+    sha1 = gt.commit(SAMPLES.listy)
     gt.print_objects()
 
-    sha2 = gt.commit(SAMPLES.nested)
+    sha2 = gt.commit(SAMPLES.listy_merge_unique)
     gt.print_objects(EXPANDED)
 
     print("CHECKOUT")
@@ -48,6 +52,7 @@ def main() -> int:
     sha3 = gt.merge_commits(sha2, sha1)
     gt.checkout(sha3)
     print(settings)
+    gt.print_objects(EXPANDED)
 
     return 0
 
